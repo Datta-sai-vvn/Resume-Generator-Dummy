@@ -83,7 +83,7 @@ You must generate ONLY the following 3 LaTeX section blocks (patches):
 
 ❌ Do NOT output explanations  
 ❌ Do NOT output analysis  
-❌ Do NOT output any other LaTeX (no header, no Education, no Certifications, no \begin{document})
+❌ Do NOT output any other LaTeX (no header, no \section{...}, no Education, no Certifications, no \begin{document})
 
 =====================================================
 🔵 WORD COUNT IMMUTABILITY CONSTRAINT (CRITICAL)
@@ -200,6 +200,7 @@ GENERAL RULES
 - Keep category names unchanged
 - Preserve existing formatting and indentation
 - Do NOT alter LaTeX structure, spacing commands, or line breaks
+- Do NOT include the \section{Skills} header (it is already in the template)
 - Do NOT remove high-signal or JD-critical skills
 - Add all missing JD tools / technologies / keywords
 - ❌ No soft skills
@@ -276,6 +277,43 @@ Before outputting Skills:
 - Verify ATS keyword coverage is preserved or improved
 
 If formatting deviates from the base template → REWRITE.
+
+-----------------------------------------------------
+CHARACTER LENGTH CONSTRAINT (HARD)
+-----------------------------------------------------
+Each skill category line MUST NOT exceed:
+
+- Maximum: 130 characters (including spaces and punctuation)
+
+Rules:
+- Character count includes category label
+- Exceeding 130 characters is a HARD FAILURE
+- If risk of overflow exists, prune or replace skills
+- Prefer shorter canonical keywords over verbose equivalents
+
+
+-----------------------------------------------------
+SELF-VALIDATION CHECK (REQUIRED)
+-----------------------------------------------------
+Before outputting the Skills section, you MUST:
+
+1. Count words per line (must be 12–15)
+2. Count characters per line (must be ≤130)
+3. Visually simulate LaTeX wrapping
+4. If ANY line risks wrapping:
+   - Prune low-impact skills
+   - Replace with shorter JD keywords
+   - Revalidate again
+
+If constraints are not met → DO NOT OUTPUT.
+Rewrite until compliant.
+
+
+Output ONLY the Skills section.
+No explanations.
+No commentary.
+No markdown.
+
 
 =====================================================
 SECTION 4 — PROJECTS RULES
@@ -355,13 +393,13 @@ Each generated project MUST include a dedicated stack line
 immediately below the project title.
 
 FORMAT (REQUIRED):
-
-\textbf{<Four Word Project Name>: <Descriptor>} \\
-\small{\textit{Stack: <comma-separated tools, frameworks, systems>}} \\
-\vspace{-0.5cm}
+\textbf{<Project Name>: <Descriptor>} $|$ \textit{<Stack>} \\
+\vspace{-0.45cm}
 \begin{itemize}[leftmargin=*, topsep=0pt, itemsep=0pt, parsep=0pt, partopsep=0pt]
 
 Rules:
+- Use the pipe symbol `$|$` to separate Title and Stack.
+- Keep it on ONE line if possible.
 - Stack MUST include only tools already present in Skills or JD
 - Stack MUST reflect tools actually used in the project bullets
 - Do NOT invent exotic or proprietary tools
@@ -693,7 +731,7 @@ HARD FAILURE CONDITIONS
 🔵 WORD COUNT CONSTRAINT (CRITICAL)
 =====================================================
 
-- Each project bullet MUST be **14–16 words**
+- Each project bullet MUST be **12–18 words**
 - Hard failure if violated
 
 =====================================================
@@ -904,6 +942,7 @@ You MUST output ONLY these 4 LaTeX blocks, in this exact order, with the markers
    %==== AUTOGEN_PROJECTS_END
 
 Do NOT output anything else.
+Do NOT include \section{...} headers inside the blocks.
 
 =====================================================
 🔻 JOB DESCRIPTION INPUT (PASTE BELOW)
