@@ -23,7 +23,17 @@ import stat
 # Setup
 # =========================
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Get API Key (Local .env or Streamlit Secrets)
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key and "OPENAI_API_KEY" in st.secrets:
+    api_key = st.secrets["OPENAI_API_KEY"]
+
+if not api_key:
+    st.error("Missing OpenAI API Key! Please set OPENAI_API_KEY in .env (local) or Streamlit Secrets (cloud).")
+    st.stop()
+
+client = OpenAI(api_key=api_key)
 
 APP_DIR = Path(__file__).parent
 PROMPTS_DIR = APP_DIR / "prompts"
