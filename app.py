@@ -748,7 +748,9 @@ else: # Batch JD
                         success_count += 1
                     else:
                         fail_reason = res.get("error", "Compilation failed")
-                        failures.append(f"JD #{display_num} ({company_name}): {fail_reason}")
+                        # Include log snippet for debugging
+                        log_snippet = res.get("log", "")[:300].replace("\n", " ")
+                        failures.append(f"JD #{display_num} ({company_name}): {fail_reason} | Log: {log_snippet}...")
 
                 except Exception as e:
                     failures.append(f"JD #{display_num}: Unexpected error {str(e)}")
