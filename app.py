@@ -12,6 +12,11 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 import pypdf
+import platform
+import tarfile
+import urllib.request
+import ssl
+import stat
 
 
 # =========================
@@ -25,6 +30,58 @@ PROMPTS_DIR = APP_DIR / "prompts"
 TEMPLATES_DIR = APP_DIR / "templates"
 RUNS_DIR = APP_DIR / "runs"
 RESUMES_DIR = APP_DIR / "resumes"
+
+def setup_tectonic_binary():
+    """
+    Ensures Tectonic binary is present for the current OS.
+    Streamlit Cloud (Linux) needs the binary downloaded manually since pip fails.
+    """
+    system = platform.system().lower()
+    binary_name = "tectonic.exe" if system == "windows" else "tectonic"
+    binary_path = APP_DIR / binary_name
+
+    if binary_path.exists():
+        return # Already installed
+
+    print(f"[{system}] Tectonic binary not found. Downloading...")
+    
+    # URLs for 0.15.0
+    if system == "windows":
+        url = "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic@0.15.0/tectonic-0.15.0-x86_64-pc-windows-msvc.zip"
+    else: # Linux (Streamlit Cloud is usually x86_64 Linux)
+        url = "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic@0.15.0/tectonic-0.15.0-x86_64-unknown-linux-gnu.tar.gz"
+
+    # Download
+    print(f"Downloading from {url}...")
+    try:
+        # Unsafe context for speed/ease in this script (safe for public github release)
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        with urllib.request.urlopen(url, context=ctx) as response:
+            data = response.read()
+            
+        # Extract
+        if url.endswith(".zip"):
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                zf.extractall(APP_DIR)
+        else: # tar.gz
+            with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+                tar.extractall(APP_DIR)
+                
+        # chmod +x for Linux
+        if system != "windows" and binary_path.exists():
+            st = os.stat(binary_path)
+            os.chmod(binary_path, st.st_mode | stat.S_IEXEC)
+            
+        print("Tectonic binary installed successfully.")
+        
+    except Exception as e:
+        print(f"Failed to install Tectonic: {e}")
+
+# Run setup immediately
+setup_tectonic_binary()
 
 
 # Role -> prompt file
@@ -152,10 +209,15 @@ def compile_latex(tex_path: Path, workdir: Path) -> tuple[bool, str, Path | None
     Tectonic automatically downloads packages on first run.
     """
     # Tectonic command: tectonic -X compile <file>
-    # Check for local tectonic.exe in APP_DIR first
+    # Check for local binary in APP_DIR (Auto-downloaded by setup_tectonic_binary)
+    # Windows: tectonic.exe, Linux: tectonic
     tectonic_cmd = "tectonic"
-    if (APP_DIR / "tectonic.exe").exists():
-        tectonic_cmd = str(APP_DIR / "tectonic.exe")
+    
+    local_bin_name = "tectonic.exe" if platform.system().lower() == "windows" else "tectonic"
+    local_bin = APP_DIR / local_bin_name
+    
+    if local_bin.exists():
+        tectonic_cmd = str(local_bin.resolve())
 
     cmd = [
         tectonic_cmd,
