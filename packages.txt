@@ -1,0 +1,4 @@
+libgraphite2-3
+libharfbuzz0b
+libfontconfig1
+libicu-dev
