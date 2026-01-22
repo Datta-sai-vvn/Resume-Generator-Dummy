@@ -78,8 +78,8 @@ TASK SCOPE (STRICT)
 =====================================================
 You must generate ONLY the following 3 LaTeX section blocks (patches):
 1) Summary (exactly 3 lines)
-2) Skills
 4) Projects
+3) Skills (At the very bottom)
 
 ❌ Do NOT output explanations  
 ❌ Do NOT output analysis  
@@ -193,114 +193,39 @@ Failure to normalize the role title → HARD FAILURE.
 
 
 =====================================================
-SECTION 2 — SKILLS RULES (UPDATED — TEMPLATE-SAFE)
+SECTION 2 — SKILLS RULES (UPDATED — COMPACT PARAGRAPH)
 =====================================================
 
-GENERAL RULES
-- Keep category names unchanged
-- Preserve existing formatting and indentation
-- Do NOT alter LaTeX structure, spacing commands, or line breaks
-- Do NOT include the \section{Skills} header (it is already in the template)
-- Do NOT remove high-signal or JD-critical skills
-- Add all missing JD tools / technologies / keywords
-- ❌ No soft skills
-- ❌ No vague buzzwords
-- Use ATS-standard canonical naming
+OUTPUT FORMAT (MANDATORY):
+- Output ALL skills as a single, continuous paragraph.
+- Separate individual skills with the pipe symbol ( $|$ ).
+- Do NOT use category labels (e.g., "Languages:", "Tools:").
+- Do NOT use newlines or bullet points.
+
+EXAMPLE OUTPUT:
+Python (Pandas, NumPy, Scikit-learn) $|$ SQL $|$ PyTorch $|$ NLP $|$ AWS $|$ Docker $|$ Kubernetes $|$ CI/CD $|$ ...
 
 -----------------------------------------------------
-SINGLE-LINE LAYOUT CONSTRAINT (CRITICAL)
+CONTENT RULES
 -----------------------------------------------------
-Each skill category MUST remain on a single visual line
-without altering the resume template.
+1) **Priority:** Start with the most critical "Hard Skills" (Languages, Core ML/DL frameworks).
+2) **Grouping:** Logically group related tools together using parentheses or adjacency (e.g., "GenAI (LLMs, RAG, LangChain)").
+3) **Coverage:** Verify that ALL high-priority JD keywords are included.
+4) **Pruning:** If the text becomes too long (visually > 4-5 lines), prune low-value tools.
+5) **Forbidden:** No soft skills (e.g., "Leadership", "Communication") unless explicitly asked. No category headers.
+
+-----------------------------------------------------
+CHARACTER/LENGTH CHECK
+-----------------------------------------------------
+- **Mandatory Density:** The Skills block MUST visually fill **3 to 4 full lines** in the document.
+- **Target Length:** approx. **450 - 600 characters**.
+- **Under-filling is a Failure:** If the skills block is only 1-2 lines, you FAILED. Add more relevant TIER 2/3 keywords from the JD or standard ML stack.
+- **Over-filling:** If > 5 lines, prune slightly.
 
 Rules:
-- No additional line breaks
-- No forced wrapping
-- No font-size, spacing, or margin changes
-- If content risks wrapping, adjust skill selection instead
-
------------------------------------------------------
-WORD COUNT CONSTRAINT PER LINE (MANDATORY)
------------------------------------------------------
-Each skill category line MUST contain:
-
-- **Minimum: 10 words**
-- **Maximum: 11 words**
-
-Rules:
-- Word count includes category label words
-- Comma-separated items count as individual words
-- Hyphenated terms count as ONE word
-- Exceeding this range is a HARD FAILURE
-
------------------------------------------------------
-SAFE DYNAMIC PRUNING LOGIC (NEW)
------------------------------------------------------
-If adding JD-required keywords risks:
-- line overflow OR
-- exceeding the 10–11 word limit
-
-You MUST prune ONLY low-impact items while preserving layout.
-
-PRUNING PRIORITY (SAFE ORDER):
-
-1) Remove visually long but low-ATS-impact terms
-   (e.g., admin roles, UI tools, generic process phrases)
-
-2) Consolidate implied skills
-   (e.g., keep “ETL Pipelines” → remove “Data Ingestion”)
-
-3) Prefer compact, high-signal keywords over verbose phrases
-   (e.g., “Model Deployment” over “Production ML Systems”)
-
-FORBIDDEN:
-- Removing JD TIER 1 keywords
-- Removing exact JD noun phrases
-- Altering category titles or punctuation
-
------------------------------------------------------
-KEYWORD REPLACEMENT GUARANTEE
------------------------------------------------------
-Whenever a skill is removed:
-- It MUST be replaced with an equal or higher ATS-value JD keyword
-- Net keyword relevance must strictly increase
-- Never delete without substitution
-
------------------------------------------------------
-FINAL TEMPLATE VALIDATION (MANDATORY)
------------------------------------------------------
-Before outputting Skills:
-
-- Verify no category wraps to a second line
-- Verify each line contains exactly 10–11 words
-- Verify resume formatting is unchanged
-- Verify ATS keyword coverage is preserved or improved
-
-If formatting deviates from the base template → REWRITE.
-
------------------------------------------------------
-CHARACTER LENGTH CONSTRAINT (HARD)
------------------------------------------------------
-Each skill category line MUST NOT exceed:
-
-- Maximum: 130 characters (including spaces and punctuation)
-
-Rules:
-- Character count includes category label
-- Exceeding 130 characters is a HARD FAILURE
-- If risk of overflow exists, prune or replace skills
-- Prefer shorter canonical keywords over verbose equivalents
-
-
------------------------------------------------------
-SELF-VALIDATION CHECK (REQUIRED)
------------------------------------------------------
-Before outputting the Skills section, you MUST:
-
-1. Count words per line (must be 12–15)
-2. Count characters per line (must be ≤130)
-3. Visually simulate LaTeX wrapping
-4. If ANY line risks wrapping:
+- Include EVERYTHING from the "Skills" section of the base resume.
+- Add ALL relevant TIER 1 & TIER 2 keywords from the JD.
+- Keep the format flat: `Skill | Skill | ...`
    - Prune low-impact skills
    - Replace with shorter JD keywords
    - Revalidate again
@@ -399,7 +324,8 @@ FORMAT (REQUIRED):
 
 Rules:
 - Use the pipe symbol `$|$` to separate Title and Stack.
-- Keep it on ONE line if possible.
+- **Header Length Constraint:** The COMBINED length of `<Project Title> | <Stack>` MUST NOT exceed **95 characters**.
+- **Stack Limit:** List the **Top 4-5 most impactful** technologies first. The system will truncate this list to fit the line.
 - Stack MUST include only tools already present in Skills or JD
 - Stack MUST reflect tools actually used in the project bullets
 - Do NOT invent exotic or proprietary tools
@@ -435,6 +361,11 @@ If the wrong role mode is selected → PROJECTS SECTION IS INVALID.
 
 Each project MUST contain EXACTLY 3 bullets.
 Bullet semantics MUST follow the selected JD role mode.
+
+CRITICAL LENGTH CONSTRAINT:
+- Maximum length per bullet: **88 characters** (including spaces/punctuation).
+- This is a HARD limit to prevent line wrapping.
+- Prune loose words, remove filler, and use compact phrasing to fit.
 
 -----------------------------------------------------
 IF ROLE = Research ML / Research Engineer

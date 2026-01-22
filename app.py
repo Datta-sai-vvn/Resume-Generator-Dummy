@@ -329,71 +329,192 @@ def extract_company_name(jd_text: str) -> str:
 
 
 
-def validate_skills_block(block_text: str) -> tuple[bool, str]:
+def validate_project_bullets(block_text: str) -> tuple[bool, str]:
     """
-    Validates the Skills block for strictly formatted content.
-    Constraint: Each line must be <= 130 chars (Safety Buffer).
+    Validates Project bullets to ensure NO LINE wrapping.
+    Hard limit: 88 characters per bullet.
+    Also validates Header length to prevent stack spilling (approx 100 chars raw latex).
     """
     lines = block_text.split('\n')
     for line in lines:
         raw = line.strip()
-        # Skip empty lines, comments, and section headers
         if not raw or raw.startswith('%') or raw.startswith(r'\section'):
             continue
-        
-        if len(raw) > 130:
-            return False, f"Line too long ({len(raw)} chars > 130): '{raw[:20]}...'"
             
+        # Check Header Line (Project Title + Stack)
+        # Format: \textbf{Name: Desc} | \textit{Stack} \\
+        if raw.startswith(r'\textbf'):
+             # Loose check for visual length. 
+             # Raw latex is longer than visual, but 105 is a safe upper bound for single line.
+             if len(raw) > 115: 
+                 return False, f"Project Header too long ({len(raw)} chars). Prune Stack or Title to fit 1 line."
+
+        # Only check actual item bullets
+        if raw.startswith(r'\item'):
+            # Text content is after \item
+            content = raw.replace(r'\item', '').strip()
+            if len(content) > 88:
+                 return False, f"Project bullet too long ({len(content)} > 88 chars): '{content[:30]}...'"
+    
     return True, "Valid"
 
 
-def enforce_skills_length(block_text: str, max_len: int = 130) -> str:
+def validate_skills_block(block_text: str) -> tuple[bool, str]:
     """
-    Programmatically truncates strict LaTeX skills lines to fit limit.
-    Format assumption: \textbf{Category:} Skill, Skill, Skill \\
+    Validates the Skills block for the new Single Paragraph format.
+    Constraint: 
+    - Max: 800 chars (approx 6-7 lines, safety buffer).
+    - Min: 250 chars (approx 2-3 lines, to ensure density).
     """
     lines = block_text.split('\n')
-    fixed_lines = []
+    valid_lines = [l for l in lines if l.strip() and not l.strip().startswith('%') and not l.strip().startswith(r'\section')]
+    
+    if not valid_lines:
+        return True, "Empty (pass)"
+
+    # In paragraph mode, we expect usually 1 long line, or maybe minimal wrapping.
+    # We validate the TOTAL content length mostly.
+    total_len = sum(len(l) for l in valid_lines)
+    
+    if total_len > 900:
+        return False, f"Skills too long ({total_len} > 900 chars). Prune low-priority items."
+        
+    if total_len < 250:
+         return False, f"Skills too short ({total_len} < 250 chars). User wants 3-4 full lines. Add more JD keywords."
+
+    return True, "Valid"
+
+
+def enforce_skills_length(block_text: str, max_len: int = 900) -> str:
+    """
+    Simple truncation for paragraph mode.
+    If total length > 900, plain cut at the last pipe/comma.
+    """
+    # Join all lines (except comments) to treat as one block
+    lines = block_text.split('\n')
+    content_lines = []
+    headers = []
     
     for line in lines:
         raw = line.strip()
-        if not raw or raw.startswith('%') or raw.startswith(r'\section'):
-            fixed_lines.append(line)
-            continue
-        
-        # If line is okay, keep it
-        if len(raw) <= max_len:
-            fixed_lines.append(line)
-            continue
+        if raw.startswith('%') or raw.startswith(r'\section'):
+            headers.append(line)
+        else:
+            content_lines.append(line)
             
-        # Line is too long. Try to prune last item.
-        # Check if it ends with \\
-        has_break = raw.endswith(r'\\')
-        content = raw[:-2] if has_break else raw
+    full_text = " ".join(content_lines)
+    
+    if len(full_text) <= max_len:
+        return block_text # No change needed
+        
+    # Truncate
+    # Find a cut point (pipe or comma) near max_len
+    cut_candidate = full_text[:max_len]
+    last_pipe = cut_candidate.rfind('|')
+    last_comma = cut_candidate.rfind(',')
+    
+    cut_idx = max(last_pipe, last_comma)
+    if cut_idx == -1:
+        cut_idx = max_len # Hard cut if no delimiters found
+        
+    final_text = full_text[:cut_idx]
+    
+    return "\n".join(headers + [final_text])
+
+
+
+def redistribute_project_stacks(tex_content: str) -> str:
+    """
+    Parses the LaTeX content to:
+    1. Identify Project Headers (Title | Stack).
+    2. Limit Stack to top 4 technologies.
+    3. Move 'overflow' technologies to the Skills section.
+    """
+    # 1. Extract Projects Block
+    if "proj" not in AUTOGEN_BLOCKS: return tex_content
+    p_start, p_end = AUTOGEN_BLOCKS["proj"]
+    proj_block = extract_block(tex_content, p_start, p_end)
+    if not proj_block: 
+        return tex_content
+        
+    overflow_items = []
+
+    def replace_stack(match):
+        prefix = match.group(1) # \textbf{...} | \textit{
+        stack_content = match.group(2)
+        suffix = match.group(3) # }
         
         # Split by comma
-        parts = content.split(',')
-        if len(parts) <= 1:
-            # Can't split, just keep distinct or truncate char-wise (risky), 
-            # let's just keep strict limit or risky truncate? 
-            # If it's one giant string, we can't do much without breaking word.
-            fixed_lines.append(line) 
-            continue
+        items = [s.strip() for s in stack_content.split(',')]
+        if len(items) > 4:
+            keep = items[:4]
+            move = items[4:]
+            overflow_items.extend(move)
+            return prefix + ", ".join(keep) + suffix
+        return match.group(0)
+
+    # Regex to find the Header line: \textbf{...} | \textit{...}
+    # We use non-greedy matching.
+    # Note: LaTeX might have nested braces, but stack usually simple text.
+    new_proj_block = re.sub(
+        r'(\\textbf\{.+?\}\s*\|\s*\\textit\{)(.+?)(\})', 
+        replace_stack, 
+        proj_block,
+        flags=re.MULTILINE
+    )
+    
+    # Update Projects in main text
+    # (Since we just have the block, we replace it)
+    tex_content = replace_block(tex_content, p_start, p_end, new_proj_block)
+    
+    if not overflow_items:
+        return tex_content
+
+    # 2. Extract Skills Block to append overflow
+    if "skills" not in AUTOGEN_BLOCKS: return tex_content
+    s_start, s_end = AUTOGEN_BLOCKS["skills"]
+    skills_block = extract_block(tex_content, s_start, s_end)
+    
+    # Identify existing skills to avoid dupes
+    # Skills are | separated or comma separated handled loosely
+    existing_text = skills_block.replace('\n', ' ')
+    # Normalize
+    existing_set = set()
+    for token in re.split(r'[|,\,]', existing_text):
+        clean = token.strip()
+        if clean:
+            existing_set.add(clean.lower())
             
-        # Remove items from end until it fits
-        while len(parts) > 1:
-            parts.pop() # Remove last skill
-            new_content = ",".join(parts)
-            # Reconstruct (add back \\ if needed)
-            candidate = new_content + (r'\\' if has_break else "")
-            if len(candidate) <= max_len:
-                fixed_lines.append(candidate)
-                break
+    # Filter overflow
+    to_add = []
+    for item in overflow_items:
+        if item.lower() not in existing_set:
+            to_add.append(item)
+            existing_set.add(item.lower()) # mark added
+            
+    if not to_add:
+        return tex_content
+        
+    # Append to Skills
+    # If skills block ends with newline/space, strip it slightly
+    # We want to append " | Item1 | Item2"
+    
+    # Simple append strategy:
+    # If skills block is non-empty, add " | " then items
+    clean_skills = skills_block.strip()
+    if clean_skills:
+        # Check if it ends with a separator
+        if clean_skills[-1] in ['|', ',']:
+            new_skills_block = clean_skills + " " + " | ".join(to_add)
         else:
-            # If loop finished and still too long (only 1 item left), keep it as is
-            fixed_lines.append(line)
-            
-    return "\n".join(fixed_lines)
+            new_skills_block = clean_skills + " | " + " | ".join(to_add)
+    else:
+        new_skills_block = " | ".join(to_add)
+        
+    # Replace Skills
+    tex_content = replace_block(tex_content, s_start, s_end, new_skills_block)
+    
+    return tex_content
 
 
 def run_resume_pipeline(
@@ -428,21 +549,35 @@ def run_resume_pipeline(
             raw_out = call_gpt(prompt=current_prompt, base_tex=base_tex, jd_text=jd_text, role=role)
             patch_out = sanitize_model_output_to_tex(raw_out)
             
+            # --- NEW: Redistribute Stack Overflow to Skills ---
+            patch_out = redistribute_project_stacks(patch_out)
+            # --------------------------------------------------
+            
             # Extract Skills to validate
             # We use the global AUTOGEN_BLOCKS definition
             s_start, s_end = AUTOGEN_BLOCKS["skills"]
             skills_block = extract_block(patch_out, s_start, s_end)
             
             # Validate
-            is_valid, msg = validate_skills_block(skills_block)
+            is_valid_skills, msg_skills = validate_skills_block(skills_block)
             
-            if is_valid:
+            # Extract Projects to validate
+            p_start, p_end = AUTOGEN_BLOCKS["proj"]
+            proj_block = extract_block(patch_out, p_start, p_end)
+            is_valid_proj, msg_proj = validate_project_bullets(proj_block)
+            
+            if is_valid_skills and is_valid_proj:
                 final_raw_out = raw_out
                 final_patch_out = patch_out
                 break # Success
             else:
-                # Validation failed, retry with specific instruction
-                print(f"Attempt {attempt+1} failed validation: {msg}")
+                # Validation failed
+                final_msg = ""
+                if not is_valid_skills: final_msg += f"Skills Error: {msg_skills}. "
+                if not is_valid_proj: final_msg += f"Projects Error: {msg_proj}. "
+                
+                print(f"Attempt {attempt+1} failed validation: {final_msg}")
+                msg = final_msg # For retry prompt
                 final_raw_out = raw_out # Keep last result just in case
                 final_patch_out = patch_out
                 
@@ -474,7 +609,7 @@ def run_resume_pipeline(
         
         if not is_ok:
             # FORCE TRUNCATE
-            fixed_skills = enforce_skills_length(bad_skills, max_len=88)
+            fixed_skills = enforce_skills_length(bad_skills, max_len=900)
             # Replace in the patch
             final_patch_out = replace_block(final_patch_out, s_start, s_end, fixed_skills)
             
