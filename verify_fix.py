@@ -1,48 +1,70 @@
-import sys
-import os
-from pathlib import Path
 
-sys.path.append(os.getcwd())
-from app import compile_latex
+import re
 
-def test_fix():
-    workdir = Path("test_run_fix")
-    workdir.mkdir(exist_ok=True)
+AUTOGEN_BLOCKS = {
+    "summary": ("%==== AUTOGEN_SUMMARY_START", "%==== AUTOGEN_SUMMARY_END"),
+    "skills": ("%==== AUTOGEN_SKILLS_START", "%==== AUTOGEN_SKILLS_END"),
+    "proj": ("%==== AUTOGEN_PROJECTS_START", "%==== AUTOGEN_PROJECTS_END"),
+}
+
+def extract_block(text: str, start: str, end: str) -> str:
+    print(f"Searching for {start} ... {end}")
+    pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
+    m = pattern.search(text)
+    if not m:
+        return None
+    return m.group(0).strip()
+
+def test_extraction(mock_output):
+    print(f"--- Testing Output ---\n{mock_output}\n----------------------")
+    missing = []
+    for key, (start, end) in AUTOGEN_BLOCKS.items():
+        if not extract_block(mock_output, start, end):
+            missing.append(key)
     
-    # Create a minimal test tex file mimicking the start of the template
-    tex_content = r"""
-\documentclass[letterpaper,11pt]{article}
-\usepackage{latexsym}
-\usepackage[empty]{fullpage}
-\usepackage{titlesec}
-\usepackage{marvosym}
-\usepackage[usenames,dvipsnames]{color}
-\usepackage{verbatim}
-\usepackage{enumitem}
-\usepackage[hidelinks]{hyperref}
-\usepackage{fancyhdr}
-\usepackage[english]{babel}
-\usepackage{tabularx}
-% \input{glyphtounicode} % REMOVED for Tectonic
-
-\begin{document}
-Hello World!
-\end{document}
-"""
-    tex_file = workdir / "test_fix.tex"
-    tex_file.write_text(tex_content, encoding="utf-8")
-
-    print(f"Testing compilation of patched {tex_file}...")
-    success, log, pdf_path = compile_latex(tex_file, workdir)
-    
-    if success:
-        print(f"Success! PDF saved to {pdf_path}")
+    if missing:
+        print(f"FAILED: Missing blocks: {missing}")
     else:
-        print("Compilation Failed")
-        try:
-            print(log)
-        except:
-            print("Log printing failed")
+        print("SUCCESS: All blocks found.")
 
-if __name__ == "__main__":
-    test_fix()
+# Case 1: Perfect Output
+perfect = """
+%==== AUTOGEN_SUMMARY_START
+Summary Content
+%==== AUTOGEN_SUMMARY_END
+
+%==== AUTOGEN_PROJECTS_START
+Projects Content
+%==== AUTOGEN_PROJECTS_END
+
+%==== AUTOGEN_SKILLS_START
+Skills Content
+%==== AUTOGEN_SKILLS_END
+"""
+
+# Case 2: Missing Markers (Common Failure)
+bad = """
+\section{Summary}
+Summary Content
+
+\section{Projects}
+Projects Content
+
+\section{Skills}
+Skills Content
+"""
+
+
+from app import rescue_missing_markers
+
+# ... (Previous code)
+
+print("Running Tests...")
+print("--- Standard Extraction Tests ---")
+test_extraction(perfect)
+
+print("\n--- Rescue Logic Test ---")
+rescued_bad = rescue_missing_markers(bad)
+print(f"Rescued Output:\n{rescued_bad}")
+test_extraction(rescued_bad)
+
