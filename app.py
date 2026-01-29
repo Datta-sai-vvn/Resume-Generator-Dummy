@@ -654,6 +654,7 @@ def run_resume_pipeline(
     max_retries = 3
     final_raw_out = ""
     final_patch_out = ""
+    last_exception = None
     
     current_prompt = prompt
     
@@ -661,18 +662,17 @@ def run_resume_pipeline(
         try:
             # Generate
             raw_out = call_gpt(prompt=current_prompt, base_tex=base_tex, jd_text=jd_text, role=role)
+            # Check for empty output
+            if not raw_out or not raw_out.strip():
+                raise ValueError("Model returned empty response.")
+
             patch_out = sanitize_model_output_to_tex(raw_out)
             
             # --- NEW: Redistribute Stack Overflow to Skills ---
             try:
                 patch_out = redistribute_project_stacks(patch_out)
             except Exception as e:
-                # If this fails (e.g. markers missing), we can't redistribute.
-                # But we should probably count this as a validation failure or proceed cautiously.
-                # If extract_block fails here, it means rescue failed too.
-                print(f"Redistribution failed: {e}")
-                # We let it slide? No, if markers missing validation will fail next anyway.
-                # Just catch to avoid hard crash before validation loop check.
+                print(f"Redistribution warning: {e}")
                 pass 
             # --------------------------------------------------
             
@@ -692,6 +692,7 @@ def run_resume_pipeline(
             if is_valid_skills and is_valid_proj:
                 final_raw_out = raw_out
                 final_patch_out = patch_out
+                last_exception = None # Clear error on success
                 break # Success
             else:
                 # Validation failed
@@ -703,6 +704,7 @@ def run_resume_pipeline(
                 msg = final_msg # For retry prompt
                 final_raw_out = raw_out # Keep last result just in case
                 final_patch_out = patch_out
+                last_exception = f"Validation Failed: {final_msg}"
                 
                 # Append instruction to prompt for next turn
                 if attempt < max_retries - 1:
@@ -711,16 +713,16 @@ def run_resume_pipeline(
         except Exception as e:
             # If extraction failed or other error, retry
             print(f"Attempt {attempt+1} crashed: {e}")
+            last_exception = str(e)
+            
+            # Capture raw_out if available
             final_raw_out = raw_out if 'raw_out' in locals() else ""
             final_patch_out = patch_out if 'patch_out' in locals() else ""
+            
             if attempt < max_retries - 1:
                 current_prompt += f"\n\nSYSTEM ALERT: Previous output was malformed. {str(e)}. REGENERATE strictly following the FORMAT."
 
     # Loop finished.
-    # Checks if we have a valid output? If not, perform HARD FALLBACK truncation.
-    # Is final_patch_out valid?
-    # We need to re-extract to check because loop variable scope logic above
-    # might leave us with an invalid 'final_patch_out'.
     
     # Let's try to extract and force-fix the skills block in 'final_patch_out'
     try:
@@ -749,10 +751,10 @@ def run_resume_pipeline(
         final_tex, extracted_blocks = merge_autogen_blocks(base_tex, final_patch_out)
     except Exception as e:
         # Capture raw output for debugging
-        debug_log = f"ERROR: {e}\n\nRAW OUTPUT SNIPPET (First 500 chars):\n{final_raw_out[:500]}..."
+        debug_log = f"ERROR: {e}\nLAST EXCEPTION: {last_exception}\nRAW OUTPUT SNIPPET (First 500 chars):\n{final_raw_out[:500]}..."
         return {
             "success": False,
-            "error": f"Patch merge failed: {e} | Log: {debug_log}",
+            "error": f"Merge/Pipeline Failed: {debug_log}",
             "patch_out": final_patch_out,
             "raw_out": final_raw_out
         }
