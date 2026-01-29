@@ -403,14 +403,15 @@ HARD OUTPUT RULES:
 - Do NOT output any other text.
 """
 
-    resp = client.responses.create(
-        model="gpt-4.1-mini",
-        input=[
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
         temperature=0.2,
     )
+    return resp.choices[0].message.content
     return resp.output_text
 
 
@@ -663,7 +664,16 @@ def run_resume_pipeline(
             patch_out = sanitize_model_output_to_tex(raw_out)
             
             # --- NEW: Redistribute Stack Overflow to Skills ---
-            patch_out = redistribute_project_stacks(patch_out)
+            try:
+                patch_out = redistribute_project_stacks(patch_out)
+            except Exception as e:
+                # If this fails (e.g. markers missing), we can't redistribute.
+                # But we should probably count this as a validation failure or proceed cautiously.
+                # If extract_block fails here, it means rescue failed too.
+                print(f"Redistribution failed: {e}")
+                # We let it slide? No, if markers missing validation will fail next anyway.
+                # Just catch to avoid hard crash before validation loop check.
+                pass 
             # --------------------------------------------------
             
             # Extract Skills to validate
@@ -728,7 +738,7 @@ def run_resume_pipeline(
             
     except Exception as e:
         print(f"Fallback truncation failed: {e}")
-        # Proceed with what we have
+        # Proceed with what we have (or might crash below)
     
             
     (run_dir / "model_raw_output.txt").write_text(final_raw_out or "", encoding="utf-8")
@@ -737,10 +747,12 @@ def run_resume_pipeline(
     # 5. Merge
     try:
         final_tex, extracted_blocks = merge_autogen_blocks(base_tex, final_patch_out)
-    except ValueError as e:
+    except Exception as e:
+        # Capture raw output for debugging
+        debug_log = f"ERROR: {e}\n\nRAW OUTPUT SNIPPET (First 500 chars):\n{final_raw_out[:500]}..."
         return {
             "success": False,
-            "error": f"Patch merge failed: {e}",
+            "error": f"Patch merge failed: {e} | Log: {debug_log}",
             "patch_out": final_patch_out,
             "raw_out": final_raw_out
         }
